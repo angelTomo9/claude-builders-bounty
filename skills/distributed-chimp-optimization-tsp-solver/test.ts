@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { DistributedChimpOptimizationTSP } from "./index.js";
+import { DistributedChimpOptimizationTSPOptimizer } from "./index.js";
 
-describe("DistributedChimpOptimizationTSP Group Specialization Metaheuristic", () => {
-    it("coordinates Attacker, Barrier, Chaser, and Driver roles, optimizing unit square perimeter", () => {
-        const choa = new DistributedChimpOptimizationTSP();
+describe("DistributedChimpOptimizationTSPOptimizer Social Hierarchy Metaheuristic", () => {
+    it("simulates 4 specialized hunting roles (Driver, Barrier, Chaser, Attacker), optimizing unit square perimeter", () => {
+        const choa = new DistributedChimpOptimizationTSPOptimizer();
 
         // 4 square corners: (0,0), (0,1), (1,1), (1,0)
         choa.addPoint("A", 0, 0);
@@ -23,13 +23,13 @@ describe("DistributedChimpOptimizationTSP Group Specialization Metaheuristic", (
     });
 
     it("handles single and two point graphs correctly", () => {
-        const single = new DistributedChimpOptimizationTSP();
+        const single = new DistributedChimpOptimizationTSPOptimizer();
         single.addPoint("P1", 5, 5);
         const resSingle = single.search();
         assert.equal(resSingle.found, true);
         assert.equal(resSingle.bestCost, 0);
 
-        const pair = new DistributedChimpOptimizationTSP();
+        const pair = new DistributedChimpOptimizationTSPOptimizer();
         pair.addPoint("P1", 0, 0);
         pair.addPoint("P2", 3, 4);
         const resPair = pair.search();
@@ -38,10 +38,10 @@ describe("DistributedChimpOptimizationTSP Group Specialization Metaheuristic", (
     });
 
     it("defensively handles empty graph and duplicate points", () => {
-        const empty = new DistributedChimpOptimizationTSP();
+        const empty = new DistributedChimpOptimizationTSPOptimizer();
         assert.equal(empty.search().found, false);
 
-        const dup = new DistributedChimpOptimizationTSP();
+        const dup = new DistributedChimpOptimizationTSPOptimizer();
         dup.addPoint("X", 0, 0);
         dup.addPoint("X", 5, 5);
         assert.equal(dup.search().tour.length, 2);

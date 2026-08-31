@@ -1,10 +1,10 @@
 /**
- * Chimp Optimization Algorithm (ChOA) Hunting Specialization Metaheuristic for Traveling Salesperson Problem (TSP).
- * Primate swarm optimization primitive offering:
+ * Chimp Optimization Algorithm (ChOA) Social Hierarchy & Hunting Driver Metaheuristic for Traveling Salesperson Problem (TSP).
+ * Bio-inspired primate social pack optimization primitive offering:
  * - O(I \cdot N \cdot n) polynomial time complexity across I iterations and N chimps.
- * - 4 specialized hunting roles: Driver, Barrier, Chaser, and Attacker.
- * - Dynamic group behavioral vector updates a = 2.5 - iter * (2.5 / T).
- * - Multi-leader guided crossover and 2-Opt local search refinement.
+ * - Four specialized social hunting groups: Driver, Barrier, Chaser, Attacker.
+ * - Dynamic parameter f decaying from 2.5 to 0 modulating exploration/exploitation.
+ * - 2-Opt local search refinement.
  * - Full unit test coverage.
  */
 
@@ -22,7 +22,7 @@ export interface ChOATSPResult {
     iterationsCompleted: number;
 }
 
-export class DistributedChimpOptimizationTSP {
+export class DistributedChimpOptimizationTSPOptimizer {
     private points: Point2D[] = [];
 
     constructor() {}
@@ -63,16 +63,16 @@ export class DistributedChimpOptimizationTSP {
     }
 
     /**
-     * Role-guided crossover towards leader chimp.
+     * Chimp guided crossover towards target group role leader.
      */
-    private roleGuidedMove(chimpTour: number[], leaderTour: number[], weight: number, rng: () => number): number[] {
-        const n = chimpTour.length;
-        const result = [...chimpTour];
-        const numSwaps = Math.max(1, Math.round(weight * n * 0.35));
+    private chimpMove(tour: number[], targetTour: number[], intensity: number, rng: () => number): number[] {
+        const n = tour.length;
+        const result = [...tour];
+        const numSwaps = Math.max(1, Math.round(intensity * n * 0.35));
 
         for (let s = 0; s < numSwaps; s++) {
             const targetIdx = Math.floor(rng() * n);
-            const targetVal = leaderTour[targetIdx];
+            const targetVal = targetTour[targetIdx];
             const currIdx = result.indexOf(targetVal);
 
             if (currIdx !== -1 && currIdx !== targetIdx) {
@@ -112,7 +112,7 @@ export class DistributedChimpOptimizationTSP {
 
         const effectivePop = Math.max(8, Math.min(50, populationSize));
 
-        // 1. Initialize chimp population
+        // 1. Initialize Chimp population
         let chimps: { tour: number[]; cost: number }[] = [];
         for (let i = 0; i < effectivePop; i++) {
             const tour = this.generateRandomPermutation(n, rng);
@@ -121,6 +121,7 @@ export class DistributedChimpOptimizationTSP {
 
         chimps.sort((a, b) => a.cost - b.cost);
 
+        // 4 Key roles in chimp hierarchy
         let attacker = { ...chimps[0] };
         let barrier = { ...chimps[1] };
         let chaser = { ...chimps[2] };
@@ -128,25 +129,27 @@ export class DistributedChimpOptimizationTSP {
         const initialCost = attacker.cost;
 
         for (let iter = 0; iter < maxIterations; iter++) {
-            // Parameter a linearly decreases from 2.5 to 0
-            const a = 2.5 - iter * (2.5 / maxIterations);
+            // Dynamic parameter f decays from 2.5 to 0
+            const f = 2.5 - iter * (2.5 / maxIterations);
 
             for (let i = 0; i < effectivePop; i++) {
-                // Generate group vectors
                 const r1 = rng();
                 const r2 = rng();
+                const a = 2 * f * r1 - f;
                 const c = 2 * r2;
-                const f = 2 * a * r1 - a;
 
-                const weightAttacker = Math.min(1.0, Math.abs(f * c * 0.4));
-                const weightBarrier = Math.min(1.0, Math.abs(f * 0.3));
-                const weightChaser = Math.min(1.0, Math.abs(f * 0.2));
-                const weightDriver = Math.min(1.0, Math.abs(f * 0.1));
+                let newTour = [...chimps[i].tour];
 
-                let t1 = this.roleGuidedMove(chimps[i].tour, attacker.tour, weightAttacker, rng);
-                let t2 = this.roleGuidedMove(t1, barrier.tour, weightBarrier, rng);
-                let t3 = this.roleGuidedMove(t2, chaser.tour, weightChaser, rng);
-                let t4 = this.roleGuidedMove(t3, driver.tour, weightDriver, rng);
+                if (rng() < 0.5) {
+                    // Drive & block prey towards attacker
+                    const targetLeader = i % 4 === 0 ? attacker : (i % 4 === 1 ? barrier : (i % 4 === 2 ? chaser : driver));
+                    const intensity = Math.min(1.0, 0.4 * Math.abs(a) + 0.1 * c);
+                    newTour = this.chimpMove(newTour, targetLeader.tour, intensity, rng);
+                } else {
+                    // Attack phase: integrate roles
+                    newTour = this.chimpMove(newTour, attacker.tour, 0.5, rng);
+                    newTour = this.chimpMove(newTour, barrier.tour, 0.3, rng);
+                }
 
                 // 2-opt local search refinement
                 if (rng() < 0.2) {
@@ -157,21 +160,20 @@ export class DistributedChimpOptimizationTSP {
                     const right = Math.max(l, rp);
                     let lp = left, rpp = right;
                     while (lp < rpp) {
-                        const tmp = t4[lp];
-                        t4[lp] = t4[rpp];
-                        t4[rpp] = tmp;
+                        const tmp = newTour[lp];
+                        newTour[lp] = newTour[rpp];
+                        newTour[rpp] = tmp;
                         lp++;
                         rpp--;
                     }
                 }
 
-                const newCost = this.computeTourCost(t4);
+                const newCost = this.computeTourCost(newTour);
                 if (newCost < chimps[i].cost) {
-                    chimps[i] = { tour: t4, cost: newCost };
+                    chimps[i] = { tour: newTour, cost: newCost };
                 }
             }
 
-            // Update 4 specialized leaders
             chimps.sort((a, b) => a.cost - b.cost);
             attacker = { ...chimps[0] };
             barrier = { ...chimps[1] };
