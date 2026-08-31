@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { DistributedSalpSwarmTSPOptimizer } from "./index.js";
 
-describe("DistributedSalpSwarmTSPOptimizer Leader-Follower Metaheuristic", () => {
-    it("simulates salp chain propulsion towards food, optimizing unit square perimeter", () => {
+describe("DistributedSalpSwarmTSPOptimizer Ocean Chain Metaheuristic", () => {
+    it("simulates leader salp food tracking and follower chain propagation, optimizing unit square perimeter", () => {
         const ssa = new DistributedSalpSwarmTSPOptimizer();
 
         // 4 square corners: (0,0), (0,1), (1,1), (1,0)
@@ -12,7 +12,7 @@ describe("DistributedSalpSwarmTSPOptimizer Leader-Follower Metaheuristic", () =>
         ssa.addPoint("C", 1, 1);
         ssa.addPoint("D", 1, 0);
 
-        const result = ssa.search(120, 15);
+        const result = ssa.search(120, 16);
         assert.equal(result.found, true);
         assert.equal(result.tour.length, 5);
         assert.equal(result.tour[0], result.tour[result.tour.length - 1]);

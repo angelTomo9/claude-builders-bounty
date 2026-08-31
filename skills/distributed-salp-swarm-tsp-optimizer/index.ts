@@ -1,9 +1,9 @@
 /**
- * Salp Swarm Algorithm (SSA) Leader-Follower Chain Metaheuristic for Traveling Salesperson Problem (TSP).
- * Bio-inspired pelagic tunicate swarm optimization primitive offering:
+ * Salp Swarm Algorithm (SSA) Deep Ocean Chain & Food Tracking Metaheuristic for Traveling Salesperson Problem (TSP).
+ * Bio-inspired salpidae swarming optimization primitive offering:
  * - O(I \cdot N \cdot n) polynomial time complexity across I iterations and N salps.
- * - Dynamic balancing coefficient c_1 = 2 * exp(-(4 * t / T)^2).
- * - Chain movement: Leader salps navigate towards food source, follower salps follow predecessor in chain.
+ * - Leader salp food attraction modulated by c1 = 2 * exp(-(4t / T)^2).
+ * - Follower salp chain propagation obeying cohesive hydrodynamic swimming dynamics.
  * - 2-Opt local search refinement.
  * - Full unit test coverage.
  */
@@ -14,7 +14,7 @@ export interface Point2D {
     y: number;
 }
 
-export interface SalpTSPResult {
+export interface SSATSPResult {
     found: boolean;
     initialCost: number;
     bestCost: number;
@@ -63,11 +63,11 @@ export class DistributedSalpSwarmTSPOptimizer {
     }
 
     /**
-     * Salp guided crossover towards target leader / predecessor.
+     * Salp guided crossover towards swarming target / leader.
      */
-    private salpMove(salpTour: number[], targetTour: number[], intensity: number, rng: () => number): number[] {
-        const n = salpTour.length;
-        const result = [...salpTour];
+    private salpMove(tour: number[], targetTour: number[], intensity: number, rng: () => number): number[] {
+        const n = tour.length;
+        const result = [...tour];
         const numSwaps = Math.max(1, Math.round(intensity * n * 0.35));
 
         for (let s = 0; s < numSwaps; s++) {
@@ -92,7 +92,7 @@ export class DistributedSalpSwarmTSPOptimizer {
         maxIterations = 100,
         populationSize = 20,
         rng: () => number = Math.random
-    ): SalpTSPResult {
+    ): SSATSPResult {
         const n = this.points.length;
         if (n === 0) {
             return { found: false, initialCost: 0, bestCost: 0, tour: [], iterationsCompleted: 0 };
@@ -112,7 +112,7 @@ export class DistributedSalpSwarmTSPOptimizer {
 
         const effectivePop = Math.max(5, Math.min(50, populationSize));
 
-        // 1. Initialize Salp population
+        // 1. Initialize Salp Swarm population
         let salps: { tour: number[]; cost: number }[] = [];
         for (let i = 0; i < effectivePop; i++) {
             const tour = this.generateRandomPermutation(n, rng);
@@ -121,27 +121,20 @@ export class DistributedSalpSwarmTSPOptimizer {
 
         salps.sort((a, b) => a.cost - b.cost);
 
-        let foodSource = { ...salps[0] }; // Best global food source
+        let foodSource = { ...salps[0] };
         const initialCost = foodSource.cost;
 
         for (let iter = 0; iter < maxIterations; iter++) {
-            // Adaptive exploration coefficient c1
+            // Decay parameter c1 = 2 * exp(-(4 * iter / maxIterations)^2)
             const c1 = 2 * Math.exp(-Math.pow((4 * iter) / maxIterations, 2));
 
-            for (let i = 0; i < effectivePop; i++) {
-                let newTour: number[];
+            // Leader salp update (first half)
+            for (let i = 0; i < Math.floor(effectivePop / 2); i++) {
+                const c2 = rng();
+                const c3 = rng();
+                const intensity = Math.min(1.0, 0.5 * c1 * (c3 >= 0.5 ? c2 : (1 - c2)));
 
-                if (i === 0) {
-                    // Leader salp: navigates towards food source with c1 coefficient
-                    const c2 = rng();
-                    const c3 = rng();
-                    const intensity = Math.min(1.0, c1 * (c3 >= 0.5 ? c2 : 1 - c2));
-                    newTour = this.salpMove(salps[0].tour, foodSource.tour, intensity, rng);
-                } else {
-                    // Follower salps: follow predecessor salp in the chain (Newton's laws of motion)
-                    const predecessor = salps[i - 1].tour;
-                    newTour = this.salpMove(salps[i].tour, predecessor, 0.5, rng);
-                }
+                let newTour = this.salpMove(salps[i].tour, foodSource.tour, intensity, rng);
 
                 // 2-opt local search refinement
                 if (rng() < 0.2) {
@@ -169,7 +162,41 @@ export class DistributedSalpSwarmTSPOptimizer {
                 }
             }
 
+            // Follower salp chain update (second half)
+            for (let i = Math.floor(effectivePop / 2); i < effectivePop; i++) {
+                const prevSalp = salps[i - 1];
+                let newTour = this.salpMove(salps[i].tour, prevSalp.tour, 0.6, rng);
+
+                // 2-opt local search refinement
+                if (rng() < 0.15) {
+                    const l = Math.floor(rng() * n);
+                    let rp = Math.floor(rng() * n);
+                    while (rp === l) rp = Math.floor(rng() * n);
+                    const left = Math.min(l, rp);
+                    const right = Math.max(l, rp);
+                    let lp = left, rpp = right;
+                    while (lp < rpp) {
+                        const tmp = newTour[lp];
+                        newTour[lp] = newTour[rpp];
+                        newTour[rpp] = tmp;
+                        lp++;
+                        rpp--;
+                    }
+                }
+
+                const newCost = this.computeTourCost(newTour);
+                if (newCost < salps[i].cost) {
+                    salps[i] = { tour: newTour, cost: newCost };
+                    if (newCost < foodSource.cost) {
+                        foodSource = { tour: newTour, cost: newCost };
+                    }
+                }
+            }
+
             salps.sort((a, b) => a.cost - b.cost);
+            if (salps[0].cost < foodSource.cost) {
+                foodSource = { ...salps[0] };
+            }
         }
 
         const finalTour: string[] = [...foodSource.tour.map(i => this.points[i].id), this.points[foodSource.tour[0]].id];
