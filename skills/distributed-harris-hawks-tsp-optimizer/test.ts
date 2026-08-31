@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { DistributedHarrisHawksTSPOptimizer } from "./index.js";
 
-describe("DistributedHarrisHawksTSPOptimizer Pounce Metaheuristic", () => {
-    it("executes soft/hard besiege and rapid dive tactics, optimizing unit square perimeter", () => {
+describe("DistributedHarrisHawksTSPOptimizer Cooperative Chasing Metaheuristic", () => {
+    it("simulates escaping energy decay, soft/hard besiege, and rapid dives, optimizing unit square perimeter", () => {
         const hho = new DistributedHarrisHawksTSPOptimizer();
 
         // 4 square corners: (0,0), (0,1), (1,1), (1,0)
@@ -12,7 +12,7 @@ describe("DistributedHarrisHawksTSPOptimizer Pounce Metaheuristic", () => {
         hho.addPoint("C", 1, 1);
         hho.addPoint("D", 1, 0);
 
-        const result = hho.search(120, 15);
+        const result = hho.search(120, 16);
         assert.equal(result.found, true);
         assert.equal(result.tour.length, 5);
         assert.equal(result.tour[0], result.tour[result.tour.length - 1]);
