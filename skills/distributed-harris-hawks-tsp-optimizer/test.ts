@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import { DistributedHarrisHawksTSPOptimizer } from "./index.js";
 
 describe("DistributedHarrisHawksTSPOptimizer Cooperative Chasing Metaheuristic", () => {
-    it("simulates escaping energy decay, soft/hard besiege, and rapid dives, optimizing unit square perimeter", () => {
+    it("simulates escaping energy decay and besiege tactics, optimizing unit square perimeter", () => {
         const hho = new DistributedHarrisHawksTSPOptimizer();
 
         // 4 square corners: (0,0), (0,1), (1,1), (1,0)

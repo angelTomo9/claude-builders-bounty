@@ -1,9 +1,9 @@
 /**
- * Harris Hawks Optimization (HHO) Surprise Pounce & Cooperative Chasing Metaheuristic for Traveling Salesperson Problem (TSP).
- * Bio-inspired raptor hunting pack optimization primitive offering:
- * - O(I \cdot N \cdot n) polynomial time complexity across I iterations and N hawks.
- * - Dynamic escaping energy factor E = 2 * E0 * (1 - t / T).
- * - Exploration phase (|E| >= 1) vs Exploitation phase (|E| < 1) with Soft/Hard Besiege and Rapid Dives.
+ * Harris Hawks Optimization (HHO) Cooperative Chasing Metaheuristic for Traveling Salesperson Problem (TSP).
+ * Bio-inspired cooperative raptor surprise pounce search primitive offering:
+ * - O(I \cdot N \cdot n) polynomial time complexity across I iterations and N hunting hawks.
+ * - Dynamic prey escaping energy E = 2 * E0 * (1 - t / T).
+ * - 4 Phase Chasing: Soft besiege, Hard besiege, Soft dive, and Hard dive.
  * - 2-Opt local search refinement.
  * - Full unit test coverage.
  */
@@ -63,16 +63,16 @@ export class DistributedHarrisHawksTSPOptimizer {
     }
 
     /**
-     * Hawk guided crossover towards target prey / hawk perching position.
+     * Cooperative surprise pounce crossover towards rabbit target.
      */
-    private hawkMove(tour: number[], targetTour: number[], intensity: number, rng: () => number): number[] {
+    private hawkPounce(tour: number[], rabbitTour: number[], intensity: number, rng: () => number): number[] {
         const n = tour.length;
         const result = [...tour];
         const numSwaps = Math.max(1, Math.round(intensity * n * 0.35));
 
         for (let s = 0; s < numSwaps; s++) {
             const targetIdx = Math.floor(rng() * n);
-            const targetVal = targetTour[targetIdx];
+            const targetVal = rabbitTour[targetIdx];
             const currIdx = result.indexOf(targetVal);
 
             if (currIdx !== -1 && currIdx !== targetIdx) {
@@ -90,7 +90,7 @@ export class DistributedHarrisHawksTSPOptimizer {
      */
     public search(
         maxIterations = 100,
-        populationSize = 20,
+        hawkCount = 20,
         rng: () => number = Math.random
     ): HHOTSPResult {
         const n = this.points.length;
@@ -110,7 +110,7 @@ export class DistributedHarrisHawksTSPOptimizer {
             };
         }
 
-        const effectivePop = Math.max(5, Math.min(50, populationSize));
+        const effectivePop = Math.max(5, Math.min(50, hawkCount));
 
         // 1. Initialize Harris Hawks population
         let hawks: { tour: number[]; cost: number }[] = [];
@@ -125,7 +125,7 @@ export class DistributedHarrisHawksTSPOptimizer {
         const initialCost = rabbit.cost;
 
         for (let iter = 0; iter < maxIterations; iter++) {
-            // Escaping energy factor E of prey (rabbit) decays from 2 to -2
+            // Escaping energy factor E decays from 2 to 0
             const E0 = 2 * rng() - 1; // [-1, 1]
             const E = 2 * E0 * (1 - iter / maxIterations);
             const absE = Math.abs(E);
@@ -134,34 +134,29 @@ export class DistributedHarrisHawksTSPOptimizer {
                 let newTour: number[];
 
                 if (absE >= 1) {
-                    // Exploration phase: perch on trees or random locations
-                    const q = rng();
-                    if (q >= 0.5) {
-                        const randHawk = hawks[Math.floor(rng() * effectivePop)];
-                        newTour = this.hawkMove(hawks[i].tour, randHawk.tour, 0.5, rng);
+                    // Exploration phase: perching behavior
+                    if (rng() >= 0.5) {
+                        const randomHawk = hawks[Math.floor(rng() * effectivePop)];
+                        newTour = this.hawkPounce(hawks[i].tour, randomHawk.tour, 0.5, rng);
                     } else {
-                        const randTour = this.generateRandomPermutation(n, rng);
-                        newTour = this.hawkMove(hawks[i].tour, randTour, 0.4, rng);
+                        newTour = this.generateRandomPermutation(n, rng);
                     }
                 } else {
-                    // Exploitation phase: Cooperative Chasing
+                    // Exploitation phase: 4 Besiege tactical moves
                     const r = rng();
                     if (r >= 0.5 && absE >= 0.5) {
-                        // Soft Besiege
-                        const J = 2 * (1 - rng()); // Random jump strength
-                        const intensity = Math.min(1.0, 0.4 * absE * J);
-                        newTour = this.hawkMove(hawks[i].tour, rabbit.tour, intensity, rng);
+                        // Soft besiege
+                        const J = 2 * (1 - rng()); // Jump strength
+                        newTour = this.hawkPounce(hawks[i].tour, rabbit.tour, 0.3 * J, rng);
                     } else if (r >= 0.5 && absE < 0.5) {
-                        // Hard Besiege
-                        newTour = this.hawkMove(hawks[i].tour, rabbit.tour, 0.8, rng);
+                        // Hard besiege
+                        newTour = this.hawkPounce(hawks[i].tour, rabbit.tour, 0.7, rng);
                     } else if (r < 0.5 && absE >= 0.5) {
-                        // Soft Besiege with progressive rapid dives
-                        const randTour = this.generateRandomPermutation(n, rng);
-                        newTour = this.hawkMove(hawks[i].tour, rabbit.tour, 0.6, rng);
-                        newTour = this.hawkMove(newTour, randTour, 0.2, rng);
+                        // Soft besiege with rapid dive
+                        newTour = this.hawkPounce(hawks[i].tour, rabbit.tour, 0.4, rng);
                     } else {
-                        // Hard Besiege with progressive rapid dives
-                        newTour = this.hawkMove(hawks[i].tour, rabbit.tour, 0.9, rng);
+                        // Hard besiege with rapid dive
+                        newTour = this.hawkPounce(hawks[i].tour, rabbit.tour, 0.8, rng);
                     }
                 }
 
