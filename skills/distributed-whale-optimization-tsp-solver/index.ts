@@ -1,10 +1,10 @@
 /**
- * Whale Optimization Algorithm (WOA) Bubble-Net Hunting Metaheuristic for Traveling Salesperson Problem (TSP).
- * Marine mammal swarm metaheuristic offering:
+ * Whale Optimization Algorithm (WOA) Bubble-Net Hunting & Spiral Movement Metaheuristic for Traveling Salesperson Problem (TSP).
+ * Bio-inspired cetacean foraging optimization primitive offering:
  * - O(I \cdot N \cdot n) polynomial time complexity across I iterations and N humpback whales.
- * - Encircling prey and search for prey exploration (|A| >= 1).
- * - Bubble-net spiral updating maneuver: D' \cdot e^{b l} \cdot \cos(2\pi l).
- * - 2-Opt local perturbation step.
+ * - Encircling prey and search for prey (exploration when |A| >= 1).
+ * - Logarithmic spiral bubble-net attack mechanism (exploitation when |A| < 1 with p >= 0.5).
+ * - 2-Opt local search refinement.
  * - Full unit test coverage.
  */
 
@@ -22,7 +22,7 @@ export interface WOATSPResult {
     iterationsCompleted: number;
 }
 
-export class DistributedWhaleOptimizationTSP {
+export class DistributedWhaleOptimizationTSPOptimizer {
     private points: Point2D[] = [];
 
     constructor() {}
@@ -63,12 +63,12 @@ export class DistributedWhaleOptimizationTSP {
     }
 
     /**
-     * Crossover step moving whale towards target (prey or random whale).
+     * Whale guided crossover towards target leader / prey position.
      */
-    private moveWhale(whaleTour: number[], targetTour: number[], intensity: number, rng: () => number): number[] {
-        const n = whaleTour.length;
-        const result = [...whaleTour];
-        const numSwaps = Math.max(1, Math.round(intensity * n * 0.4));
+    private whaleMove(tour: number[], targetTour: number[], intensity: number, rng: () => number): number[] {
+        const n = tour.length;
+        const result = [...tour];
+        const numSwaps = Math.max(1, Math.round(intensity * n * 0.35));
 
         for (let s = 0; s < numSwaps; s++) {
             const targetIdx = Math.floor(rng() * n);
@@ -86,20 +86,12 @@ export class DistributedWhaleOptimizationTSP {
     }
 
     /**
-     * Bubble-net logarithmic spiral permutation update.
-     */
-    private spiralBubbleNet(whaleTour: number[], bestTour: number[], b: number, l: number, rng: () => number): number[] {
-        const spiralWeight = Math.min(1.0, Math.abs(Math.exp(b * l) * Math.cos(2 * Math.PI * l)));
-        return this.moveWhale(whaleTour, bestTour, spiralWeight, rng);
-    }
-
-    /**
      * Solves TSP using Whale Optimization Algorithm.
      */
     public search(
         maxIterations = 100,
         populationSize = 20,
-        b = 1.0, // Spiral shape constant
+        b = 1.0, // Logarithmic spiral constant
         rng: () => number = Math.random
     ): WOATSPResult {
         const n = this.points.length;
@@ -121,7 +113,7 @@ export class DistributedWhaleOptimizationTSP {
 
         const effectivePop = Math.max(5, Math.min(50, populationSize));
 
-        // 1. Initialize whale population
+        // 1. Initialize Whale population
         let whales: { tour: number[]; cost: number }[] = [];
         for (let i = 0; i < effectivePop; i++) {
             const tour = this.generateRandomPermutation(n, rng);
@@ -134,45 +126,48 @@ export class DistributedWhaleOptimizationTSP {
         const initialCost = bestWhale.cost;
 
         for (let iter = 0; iter < maxIterations; iter++) {
-            const a = 2.0 - (iter * (2.0 / maxIterations)); // a linearly decreases from 2 to 0
+            // Linearly decreasing parameter a from 2 to 0
+            const a = 2 - iter * (2 / maxIterations);
 
             for (let i = 0; i < effectivePop; i++) {
                 const r = rng();
                 const A = 2 * a * r - a;
                 const C = 2 * r;
                 const p = rng();
+                const l = (rng() - 0.5) * 2; // [-1, 1]
 
                 let newTour: number[];
 
                 if (p < 0.5) {
                     if (Math.abs(A) < 1) {
-                        // Encircling prey (move towards best whale)
-                        newTour = this.moveWhale(whales[i].tour, bestWhale.tour, Math.abs(A) / 2.0, rng);
+                        // Encircling prey
+                        const intensity = Math.min(1.0, 0.4 * C * (1 - iter / maxIterations));
+                        newTour = this.whaleMove(whales[i].tour, bestWhale.tour, intensity, rng);
                     } else {
-                        // Search for prey (exploration: move towards random whale)
-                        const randWhaleIdx = Math.floor(rng() * effectivePop);
-                        newTour = this.moveWhale(whales[i].tour, whales[randWhaleIdx].tour, Math.abs(A) / 2.0, rng);
+                        // Search for prey (Exploration)
+                        const randWhale = whales[Math.floor(rng() * effectivePop)];
+                        newTour = this.whaleMove(whales[i].tour, randWhale.tour, 0.5, rng);
                     }
                 } else {
-                    // Bubble-net spiral attack
-                    const l = (rng() * 2) - 1; // Uniform in [-1, 1]
-                    newTour = this.spiralBubbleNet(whales[i].tour, bestWhale.tour, b, l, rng);
+                    // Bubble-net attacking method via logarithmic spiral
+                    const spiralIntensity = Math.min(1.0, 0.5 * Math.exp(b * l) * Math.abs(Math.cos(2 * Math.PI * l)));
+                    newTour = this.whaleMove(whales[i].tour, bestWhale.tour, spiralIntensity, rng);
                 }
 
-                // 2-opt random walk refinement
+                // 2-opt local search refinement
                 if (rng() < 0.2) {
-                    const l = Math.floor(rng() * n);
-                    let r = Math.floor(rng() * n);
-                    while (r === l) r = Math.floor(rng() * n);
-                    const left = Math.min(l, r);
-                    const right = Math.max(l, r);
-                    let lp = left, rp = right;
-                    while (lp < rp) {
+                    const lIdx = Math.floor(rng() * n);
+                    let rp = Math.floor(rng() * n);
+                    while (rp === lIdx) rp = Math.floor(rng() * n);
+                    const left = Math.min(lIdx, rp);
+                    const right = Math.max(lIdx, rp);
+                    let lp = left, rpp = right;
+                    while (lp < rpp) {
                         const tmp = newTour[lp];
-                        newTour[lp] = newTour[rp];
-                        newTour[rp] = tmp;
+                        newTour[lp] = newTour[rpp];
+                        newTour[rpp] = tmp;
                         lp++;
-                        rp--;
+                        rpp--;
                     }
                 }
 
