@@ -1,9 +1,9 @@
 /**
- * Bat Algorithm (BA) Echolocation Frequency & Loudness Metaheuristic for Traveling Salesperson Problem (TSP).
- * Bio-inspired microbat acoustic echolocation optimization primitive offering:
- * - O(I \cdot N \cdot n) polynomial time complexity across I iterations and N bats.
- * - Dynamic pulse frequency modulation f_i = f_min + (f_max - f_min) * beta.
- * - Loudness decay A_i(t+1) = alpha * A_i(t) and pulse rate increase r_i(t+1) = r0 * (1 - exp(-gamma * t)).
+ * Bat Algorithm (BA) Echolocation Frequency & Loudness-Pulse Emission Metaheuristic for Traveling Salesperson Problem (TSP).
+ * Bio-inspired microbat echolocation optimization primitive offering:
+ * - O(I \cdot N \cdot n) polynomial time complexity across I iterations and N virtual bats.
+ * - Dynamic frequency tuning f \in [f_min, f_max] controlling exploratory velocity.
+ * - Loudness decay A_i^{t+1} = alpha * A_i^t and pulse emission increase r_i^{t+1} = r_i^0 * (1 - exp(-gamma * t)).
  * - 2-Opt local search refinement.
  * - Full unit test coverage.
  */
@@ -22,7 +22,7 @@ export interface BATSPResult {
     iterationsCompleted: number;
 }
 
-export class DistributedBatAlgorithmTSPOptimizer {
+export class DistributedBatTSPOptimizer {
     private points: Point2D[] = [];
 
     constructor() {}
@@ -63,9 +63,9 @@ export class DistributedBatAlgorithmTSPOptimizer {
     }
 
     /**
-     * Bat guided crossover towards echolocation target.
+     * Echolocation guided crossover towards best bat.
      */
-    private echolocationMove(tour: number[], targetTour: number[], intensity: number, rng: () => number): number[] {
+    private echolocateMove(tour: number[], targetTour: number[], intensity: number, rng: () => number): number[] {
         const n = tour.length;
         const result = [...tour];
         const numSwaps = Math.max(1, Math.round(intensity * n * 0.35));
@@ -93,8 +93,8 @@ export class DistributedBatAlgorithmTSPOptimizer {
         populationSize = 20,
         fmin = 0,
         fmax = 2,
-        alpha = 0.9, // Loudness damping
-        gamma = 0.05, // Pulse rate emission factor
+        alpha = 0.9,
+        gamma = 0.05,
         rng: () => number = Math.random
     ): BATSPResult {
         const n = this.points.length;
@@ -116,16 +116,12 @@ export class DistributedBatAlgorithmTSPOptimizer {
 
         const effectivePop = Math.max(5, Math.min(50, populationSize));
 
-        // 1. Initialize Bat population
-        let bats: { tour: number[]; cost: number; A: number; r: number }[] = [];
+        // 1. Initialize Microbats population
+        let bats: { tour: number[]; cost: number; A: number; r: number; r0: number }[] = [];
         for (let i = 0; i < effectivePop; i++) {
             const tour = this.generateRandomPermutation(n, rng);
-            bats.push({
-                tour,
-                cost: this.computeTourCost(tour),
-                A: 0.5 + 0.5 * rng(),
-                r: 0.5 * rng(),
-            });
+            const r0 = 0.1 + 0.4 * rng();
+            bats.push({ tour, cost: this.computeTourCost(tour), A: 0.9, r: r0, r0 });
         }
 
         bats.sort((a, b) => a.cost - b.cost);
@@ -135,18 +131,18 @@ export class DistributedBatAlgorithmTSPOptimizer {
 
         for (let iter = 0; iter < maxIterations; iter++) {
             for (let i = 0; i < effectivePop; i++) {
-                // Pulse frequency f_i
-                const freq = fmin + (fmax - fmin) * rng();
-                const freqIntensity = Math.min(1.0, 0.3 * (1 + freq));
+                // Frequency update
+                const beta = rng();
+                const freq = fmin + (fmax - fmin) * beta;
+                const step = Math.min(1.0, 0.2 * freq);
 
-                // Position update towards best bat
-                let newTour = this.echolocationMove(bats[i].tour, bestBat.tour, freqIntensity, rng);
+                // Global echolocation step towards best
+                let newTour = this.echolocateMove(bats[i].tour, bestBat.tour, step, rng);
 
-                // Local search around best if random > pulse rate
+                // Local search around best if rand > pulse emission rate r
                 if (rng() > bats[i].r) {
-                    const avgA = bats.reduce((sum, b) => sum + b.A, 0) / effectivePop;
-                    const randTour = this.generateRandomPermutation(n, rng);
-                    newTour = this.echolocationMove(newTour, randTour, 0.2 * avgA, rng);
+                    const localStep = Math.min(1.0, bats[i].A * 0.4);
+                    newTour = this.echolocateMove(newTour, bestBat.tour, localStep, rng);
                 }
 
                 // 2-opt local search refinement
@@ -168,13 +164,13 @@ export class DistributedBatAlgorithmTSPOptimizer {
 
                 const newCost = this.computeTourCost(newTour);
 
-                // Accept new solution if improved and random < loudness
-                if ((newCost <= bats[i].cost || rng() < bats[i].A) && newCost < bats[i].cost) {
+                // Accept solution if improved and rand < loudness A
+                if (newCost < bats[i].cost || (newCost === bats[i].cost && rng() < bats[i].A)) {
                     bats[i].tour = newTour;
                     bats[i].cost = newCost;
                     // Update loudness and pulse rate
                     bats[i].A *= alpha;
-                    bats[i].r = 1 - Math.exp(-gamma * iter);
+                    bats[i].r = bats[i].r0 * (1 - Math.exp(-gamma * iter));
 
                     if (newCost < bestBat.cost) {
                         bestBat = { ...bats[i] };

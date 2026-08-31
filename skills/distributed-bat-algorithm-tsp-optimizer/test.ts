@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { DistributedBatAlgorithmTSPOptimizer } from "./index.js";
+import { DistributedBatTSPOptimizer } from "./index.js";
 
-describe("DistributedBatAlgorithmTSPOptimizer Echolocation Metaheuristic", () => {
-    it("simulates bat echolocation pulses, loudness decay, and pulse emission rate, optimizing unit square perimeter", () => {
-        const ba = new DistributedBatAlgorithmTSPOptimizer();
+describe("DistributedBatTSPOptimizer Echolocation Metaheuristic", () => {
+    it("simulates ultrasonic frequency modulation and loudness decay, optimizing unit square perimeter", () => {
+        const ba = new DistributedBatTSPOptimizer();
 
         // 4 square corners: (0,0), (0,1), (1,1), (1,0)
         ba.addPoint("A", 0, 0);
@@ -23,13 +23,13 @@ describe("DistributedBatAlgorithmTSPOptimizer Echolocation Metaheuristic", () =>
     });
 
     it("handles single and two point graphs correctly", () => {
-        const single = new DistributedBatAlgorithmTSPOptimizer();
+        const single = new DistributedBatTSPOptimizer();
         single.addPoint("P1", 5, 5);
         const resSingle = single.search();
         assert.equal(resSingle.found, true);
         assert.equal(resSingle.bestCost, 0);
 
-        const pair = new DistributedBatAlgorithmTSPOptimizer();
+        const pair = new DistributedBatTSPOptimizer();
         pair.addPoint("P1", 0, 0);
         pair.addPoint("P2", 3, 4);
         const resPair = pair.search();
@@ -38,10 +38,10 @@ describe("DistributedBatAlgorithmTSPOptimizer Echolocation Metaheuristic", () =>
     });
 
     it("defensively handles empty graph and duplicate points", () => {
-        const empty = new DistributedBatAlgorithmTSPOptimizer();
+        const empty = new DistributedBatTSPOptimizer();
         assert.equal(empty.search().found, false);
 
-        const dup = new DistributedBatAlgorithmTSPOptimizer();
+        const dup = new DistributedBatTSPOptimizer();
         dup.addPoint("X", 0, 0);
         dup.addPoint("X", 5, 5);
         assert.equal(dup.search().tour.length, 2);
