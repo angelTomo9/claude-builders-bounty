@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { DistributedJayaAlgorithmTSPOptimizer } from "./index.js";
+import { DistributedJayaTSPOptimizer } from "./index.js";
 
-describe("DistributedJayaAlgorithmTSPOptimizer Parameterless Metaheuristic", () => {
-    it("approaches best and repels from worst, optimizing unit square perimeter", () => {
-        const jaya = new DistributedJayaAlgorithmTSPOptimizer();
+describe("DistributedJayaTSPOptimizer Parameterless Metaheuristic", () => {
+    it("simulates simultaneous attraction to best and repulsion from worst, optimizing unit square perimeter", () => {
+        const jaya = new DistributedJayaTSPOptimizer();
 
         // 4 square corners: (0,0), (0,1), (1,1), (1,0)
         jaya.addPoint("A", 0, 0);
@@ -12,7 +12,7 @@ describe("DistributedJayaAlgorithmTSPOptimizer Parameterless Metaheuristic", () 
         jaya.addPoint("C", 1, 1);
         jaya.addPoint("D", 1, 0);
 
-        const result = jaya.search(120, 15);
+        const result = jaya.search(120, 16);
         assert.equal(result.found, true);
         assert.equal(result.tour.length, 5);
         assert.equal(result.tour[0], result.tour[result.tour.length - 1]);
@@ -23,13 +23,13 @@ describe("DistributedJayaAlgorithmTSPOptimizer Parameterless Metaheuristic", () 
     });
 
     it("handles single and two point graphs correctly", () => {
-        const single = new DistributedJayaAlgorithmTSPOptimizer();
+        const single = new DistributedJayaTSPOptimizer();
         single.addPoint("P1", 5, 5);
         const resSingle = single.search();
         assert.equal(resSingle.found, true);
         assert.equal(resSingle.bestCost, 0);
 
-        const pair = new DistributedJayaAlgorithmTSPOptimizer();
+        const pair = new DistributedJayaTSPOptimizer();
         pair.addPoint("P1", 0, 0);
         pair.addPoint("P2", 3, 4);
         const resPair = pair.search();
@@ -38,10 +38,10 @@ describe("DistributedJayaAlgorithmTSPOptimizer Parameterless Metaheuristic", () 
     });
 
     it("defensively handles empty graph and duplicate points", () => {
-        const empty = new DistributedJayaAlgorithmTSPOptimizer();
+        const empty = new DistributedJayaTSPOptimizer();
         assert.equal(empty.search().found, false);
 
-        const dup = new DistributedJayaAlgorithmTSPOptimizer();
+        const dup = new DistributedJayaTSPOptimizer();
         dup.addPoint("X", 0, 0);
         dup.addPoint("X", 5, 5);
         assert.equal(dup.search().tour.length, 2);

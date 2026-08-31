@@ -1,9 +1,9 @@
 /**
- * Jaya Algorithm Parameterless Global Optimization Metaheuristic for Traveling Salesperson Problem (TSP).
- * Sanskrit "Victory" (Jaya) optimization primitive offering:
+ * Jaya Algorithm (JA) Parameterless Victory-Oriented Metaheuristic for Traveling Salesperson Problem (TSP).
+ * Simple, algorithm-specific-parameter-free global search primitive offering:
  * - O(I \cdot N \cdot n) polynomial time complexity across I iterations and N candidate solutions.
- * - Dual-gradient motion: simultaneously approaches the global BEST solution while escaping the WORST solution.
- * - Parameterless formulation: requires zero algorithm-specific control parameters.
+ * - Simultaneous attraction towards global best solution and repulsion from worst solution.
+ * - Greedy selection accepting only strictly better permutations.
  * - 2-Opt local search refinement.
  * - Full unit test coverage.
  */
@@ -22,7 +22,7 @@ export interface JayaTSPResult {
     iterationsCompleted: number;
 }
 
-export class DistributedJayaAlgorithmTSPOptimizer {
+export class DistributedJayaTSPOptimizer {
     private points: Point2D[] = [];
 
     constructor() {}
@@ -63,19 +63,19 @@ export class DistributedJayaAlgorithmTSPOptimizer {
     }
 
     /**
-     * Jaya dual-gradient crossover: approaches best, repels from worst.
+     * Jaya crossover: attracts towards best tour and repulses away from worst tour.
      */
-    private jayaMove(tour: number[], bestTour: number[], worstTour: number[], r1: number, r2: number, rng: () => number): number[] {
+    private jayaMove(tour: number[], bestTour: number[], worstTour: number[], rng: () => number): number[] {
         const n = tour.length;
         const result = [...tour];
 
-        // 1. Move towards BEST
-        const bestSwaps = Math.max(1, Math.round(r1 * n * 0.35));
-        for (let s = 0; s < bestSwaps; s++) {
+        // 1. Attraction towards best solution
+        const r1 = rng();
+        const numBestSwaps = Math.max(1, Math.round(r1 * n * 0.3));
+        for (let s = 0; s < numBestSwaps; s++) {
             const targetIdx = Math.floor(rng() * n);
             const targetVal = bestTour[targetIdx];
             const currIdx = result.indexOf(targetVal);
-
             if (currIdx !== -1 && currIdx !== targetIdx) {
                 const tmp = result[targetIdx];
                 result[targetIdx] = result[currIdx];
@@ -83,14 +83,18 @@ export class DistributedJayaAlgorithmTSPOptimizer {
             }
         }
 
-        // 2. Escape from WORST (disrupt patterns shared with worst)
-        if (r2 > 0.5) {
-            const randIdx = Math.floor(rng() * n);
-            if (result[randIdx] === worstTour[randIdx]) {
-                const otherIdx = (randIdx + 1) % n;
-                const tmp = result[randIdx];
-                result[randIdx] = result[otherIdx];
-                result[otherIdx] = tmp;
+        // 2. Repulsion away from worst solution
+        const r2 = rng();
+        if (r2 < 0.5) {
+            const worstIdx = Math.floor(rng() * n);
+            const worstVal = worstTour[worstIdx];
+            const currIdx = result.indexOf(worstVal);
+            if (currIdx === worstIdx) {
+                // Perturb away from worst position
+                const swapWith = (currIdx + 1 + Math.floor(rng() * (n - 1))) % n;
+                const tmp = result[currIdx];
+                result[currIdx] = result[swapWith];
+                result[swapWith] = tmp;
             }
         }
 
@@ -124,25 +128,24 @@ export class DistributedJayaAlgorithmTSPOptimizer {
 
         const effectivePop = Math.max(5, Math.min(50, populationSize));
 
-        // 1. Initialize candidate population
-        let pop: { tour: number[]; cost: number }[] = [];
+        // 1. Initialize population
+        let population: { tour: number[]; cost: number }[] = [];
         for (let i = 0; i < effectivePop; i++) {
             const tour = this.generateRandomPermutation(n, rng);
-            pop.push({ tour, cost: this.computeTourCost(tour) });
+            population.push({ tour, cost: this.computeTourCost(tour) });
         }
 
-        pop.sort((a, b) => a.cost - b.cost);
+        population.sort((a, b) => a.cost - b.cost);
 
-        let bestSol = { ...pop[0] };
-        let worstSol = { ...pop[pop.length - 1] };
-        const initialCost = bestSol.cost;
+        let bestSolution = { ...population[0] };
+        const initialCost = bestSolution.cost;
 
         for (let iter = 0; iter < maxIterations; iter++) {
-            for (let i = 0; i < effectivePop; i++) {
-                const r1 = rng();
-                const r2 = rng();
+            const bestTour = population[0].tour;
+            const worstTour = population[population.length - 1].tour;
 
-                let newTour = this.jayaMove(pop[i].tour, bestSol.tour, worstSol.tour, r1, r2, rng);
+            for (let i = 0; i < effectivePop; i++) {
+                let newTour = this.jayaMove(population[i].tour, bestTour, worstTour, rng);
 
                 // 2-opt local search refinement
                 if (rng() < 0.2) {
@@ -162,23 +165,25 @@ export class DistributedJayaAlgorithmTSPOptimizer {
                 }
 
                 const newCost = this.computeTourCost(newTour);
-                // Jaya greedy acceptance: replace if better
-                if (newCost < pop[i].cost) {
-                    pop[i] = { tour: newTour, cost: newCost };
+
+                // Greedy selection: update if new solution is strictly better
+                if (newCost < population[i].cost) {
+                    population[i] = { tour: newTour, cost: newCost };
+                    if (newCost < bestSolution.cost) {
+                        bestSolution = { tour: newTour, cost: newCost };
+                    }
                 }
             }
 
-            pop.sort((a, b) => a.cost - b.cost);
-            bestSol = { ...pop[0] };
-            worstSol = { ...pop[pop.length - 1] };
+            population.sort((a, b) => a.cost - b.cost);
         }
 
-        const finalTour: string[] = [...bestSol.tour.map(i => this.points[i].id), this.points[bestSol.tour[0]].id];
+        const finalTour: string[] = [...bestSolution.tour.map(i => this.points[i].id), this.points[bestSolution.tour[0]].id];
 
         return {
             found: true,
             initialCost,
-            bestCost: bestSol.cost,
+            bestCost: bestSolution.cost,
             tour: finalTour,
             iterationsCompleted: maxIterations,
         };
