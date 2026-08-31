@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { DistributedCuckooSearchTSPOptimizer } from "./index.js";
 
-describe("DistributedCuckooSearchTSPOptimizer Lévy Flight Metaheuristic", () => {
-    it("simulates Lévy flights and alien egg discovery, optimizing unit square perimeter", () => {
+describe("DistributedCuckooSearchTSPOptimizer Lévy Flights Metaheuristic", () => {
+    it("simulates Lévy flights and parasitic nest replacement, optimizing unit square perimeter", () => {
         const cs = new DistributedCuckooSearchTSPOptimizer();
 
         // 4 square corners: (0,0), (0,1), (1,1), (1,0)

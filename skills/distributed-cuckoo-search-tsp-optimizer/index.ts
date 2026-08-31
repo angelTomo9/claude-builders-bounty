@@ -1,9 +1,9 @@
 /**
- * Cuckoo Search (CS) Lévy Flight & Alien Egg Discovery Metaheuristic for Traveling Salesperson Problem (TSP).
- * Bio-inspired brood parasitism optimization primitive offering:
+ * Cuckoo Search (CS) Lévy Flights & Parasitic Nest Abandonment Metaheuristic for Traveling Salesperson Problem (TSP).
+ * Bio-inspired avian brood parasitism optimization primitive offering:
  * - O(I \cdot N \cdot n) polynomial time complexity across I iterations and N host nests.
- * - Mantegna algorithm for heavy-tailed Lévy flight step sizes.
- * - Alien egg discovery probability p_a triggering nest abandonment and stochastic replacement.
+ * - Heavy-tailed Lévy flight step distribution via Mantegna's algorithm.
+ * - Parasitic egg discovery and nest abandonment probability pa with biased random walks.
  * - 2-Opt local search refinement.
  * - Full unit test coverage.
  */
@@ -63,24 +63,33 @@ export class DistributedCuckooSearchTSPOptimizer {
     }
 
     /**
-     * Mantegna Lévy flight step sample.
+     * Lévy flight step generation using Mantegna algorithm for heavy-tailed jumps.
      */
-    private sampleLevyFlight(lambda = 1.5, rng: () => number = Math.random): number {
-        // Standard normal variates approximation
-        const u = (rng() + rng() + rng() + rng() - 2) * 1.732;
-        const v = Math.abs((rng() + rng() + rng() + rng() - 2) * 1.732) + 1e-4;
-        const step = u / Math.pow(v, 1 / lambda);
-        return Math.abs(step);
+    private sampleLevyStep(lambda = 1.5, rng: () => number): number {
+        // Standard normal variates via Box-Muller transform
+        const u1 = Math.max(1e-9, rng());
+        const u2 = rng();
+        const z0 = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+
+        const v1 = Math.max(1e-9, rng());
+        const v2 = rng();
+        const z1 = Math.sqrt(-2.0 * Math.log(v1)) * Math.cos(2.0 * Math.PI * v2);
+
+        const sigma = 0.69657; // sigma_u for lambda = 1.5
+        const u = z0 * sigma;
+        const v = Math.abs(z1);
+
+        const step = u / Math.pow(v, 1.0 / lambda);
+        return Math.min(1.0, Math.max(0.05, Math.abs(step) * 0.1));
     }
 
     /**
-     * Cuckoo guided Lévy flight permutation mutation.
+     * Cuckoo guided crossover towards best nest with Lévy step.
      */
-    private levyFlightMutate(tour: number[], targetTour: number[], lambda: number, rng: () => number): number[] {
+    private cuckooMove(tour: number[], targetTour: number[], intensity: number, rng: () => number): number[] {
         const n = tour.length;
         const result = [...tour];
-        const step = this.sampleLevyFlight(lambda, rng);
-        const numSwaps = Math.max(1, Math.min(n - 1, Math.round(step * 0.3 * n)));
+        const numSwaps = Math.max(1, Math.round(intensity * n * 0.4));
 
         for (let s = 0; s < numSwaps; s++) {
             const targetIdx = Math.floor(rng() * n);
@@ -98,13 +107,12 @@ export class DistributedCuckooSearchTSPOptimizer {
     }
 
     /**
-     * Solves TSP using Cuckoo Search.
+     * Solves TSP using Cuckoo Search with Lévy flights.
      */
     public search(
         maxIterations = 100,
-        nestCount = 20,
-        pa = 0.25, // Fraction of worse nests abandoned
-        lambda = 1.5,
+        populationSize = 20,
+        pa = 0.25,
         rng: () => number = Math.random
     ): CSTSPResult {
         const n = this.points.length;
@@ -124,11 +132,11 @@ export class DistributedCuckooSearchTSPOptimizer {
             };
         }
 
-        const effectiveNests = Math.max(5, Math.min(50, nestCount));
+        const effectivePop = Math.max(5, Math.min(50, populationSize));
 
-        // 1. Initialize N host nests
+        // 1. Initialize Host Nests
         let nests: { tour: number[]; cost: number }[] = [];
-        for (let i = 0; i < effectiveNests; i++) {
+        for (let i = 0; i < effectivePop; i++) {
             const tour = this.generateRandomPermutation(n, rng);
             nests.push({ tour, cost: this.computeTourCost(tour) });
         }
@@ -139,41 +147,55 @@ export class DistributedCuckooSearchTSPOptimizer {
         const initialCost = bestNest.cost;
 
         for (let iter = 0; iter < maxIterations; iter++) {
-            // 1. Generate cuckoo egg via Lévy flight from randomly chosen nest i
-            const i = Math.floor(rng() * effectiveNests);
-            let cuckooTour = this.levyFlightMutate(nests[i].tour, bestNest.tour, lambda, rng);
+            // 1. Generate cuckoo egg via Lévy flight
+            for (let i = 0; i < effectivePop; i++) {
+                const step = this.sampleLevyStep(1.5, rng);
+                let newTour = this.cuckooMove(nests[i].tour, bestNest.tour, step, rng);
 
-            // 2-opt local search refinement
-            if (rng() < 0.2) {
-                const l = Math.floor(rng() * n);
-                let rp = Math.floor(rng() * n);
-                while (rp === l) rp = Math.floor(rng() * n);
-                const left = Math.min(l, rp);
-                const right = Math.max(l, rp);
-                let lp = left, rpp = right;
-                while (lp < rpp) {
-                    const tmp = cuckooTour[lp];
-                    cuckooTour[lp] = cuckooTour[rpp];
-                    cuckooTour[rpp] = tmp;
-                    lp++;
-                    rpp--;
+                // 2-opt local search refinement
+                if (rng() < 0.2) {
+                    const l = Math.floor(rng() * n);
+                    let rp = Math.floor(rng() * n);
+                    while (rp === l) rp = Math.floor(rng() * n);
+                    const left = Math.min(l, rp);
+                    const right = Math.max(l, rp);
+                    let lp = left, rpp = right;
+                    while (lp < rpp) {
+                        const tmp = newTour[lp];
+                        newTour[lp] = newTour[rpp];
+                        newTour[rpp] = tmp;
+                        lp++;
+                        rpp--;
+                    }
+                }
+
+                // Random host nest j
+                const j = Math.floor(rng() * effectivePop);
+                const newCost = this.computeTourCost(newTour);
+                if (newCost < nests[j].cost) {
+                    nests[j] = { tour: newTour, cost: newCost };
+                    if (newCost < bestNest.cost) {
+                        bestNest = { tour: newTour, cost: newCost };
+                    }
                 }
             }
 
-            const cuckooCost = this.computeTourCost(cuckooTour);
+            // 2. Discover worse nests with probability pa and build new ones
+            nests.sort((a, b) => a.cost - b.cost);
+            const numAbandon = Math.floor(effectivePop * pa);
 
-            // Choose random host nest j
-            const j = Math.floor(rng() * effectiveNests);
-            if (cuckooCost < nests[j].cost) {
-                nests[j] = { tour: cuckooTour, cost: cuckooCost };
-            }
+            for (let k = effectivePop - numAbandon; k < effectivePop; k++) {
+                const randNest1 = nests[Math.floor(rng() * effectivePop)];
+                const randNest2 = nests[Math.floor(rng() * effectivePop)];
+                let abandonedTour = this.cuckooMove(nests[k].tour, randNest1.tour, 0.5, rng);
+                abandonedTour = this.cuckooMove(abandonedTour, randNest2.tour, 0.3, rng);
 
-            // 2. Discover alien eggs with probability pa and abandon worse nests
-            for (let k = Math.floor(effectiveNests * (1 - pa)); k < effectiveNests; k++) {
-                if (rng() < pa) {
-                    const freshTour = this.generateRandomPermutation(n, rng);
-                    const freshCost = this.computeTourCost(freshTour);
-                    nests[k] = { tour: freshTour, cost: freshCost };
+                const abCost = this.computeTourCost(abandonedTour);
+                if (abCost < nests[k].cost) {
+                    nests[k] = { tour: abandonedTour, cost: abCost };
+                } else if (rng() < 0.5) {
+                    const fresh = this.generateRandomPermutation(n, rng);
+                    nests[k] = { tour: fresh, cost: this.computeTourCost(fresh) };
                 }
             }
 
