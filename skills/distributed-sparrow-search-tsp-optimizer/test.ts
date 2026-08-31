@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { DistributedSparrowSearchTSPOptimizer } from "./index.js";
 
-describe("DistributedSparrowSearchTSPOptimizer Swarm Metaheuristic", () => {
-    it("coordinates Producers, Scroungers, and Scouts, optimizing unit square perimeter", () => {
+describe("DistributedSparrowSearchTSPOptimizer Producer-Scrounger Metaheuristic", () => {
+    it("simulates producer-scrounger foraging and anti-predation early warnings, optimizing unit square perimeter", () => {
         const ssa = new DistributedSparrowSearchTSPOptimizer();
 
         // 4 square corners: (0,0), (0,1), (1,1), (1,0)

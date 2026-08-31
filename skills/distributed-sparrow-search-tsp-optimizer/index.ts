@@ -1,9 +1,10 @@
 /**
- * Sparrow Search Algorithm (SSA) Anti-Predation & Foraging Swarm Metaheuristic for Traveling Salesperson Problem (TSP).
- * Bio-inspired avian swarm optimization primitive offering:
- * - O(I \cdot N \cdot n) polynomial time complexity across I iterations and N sparrows.
- * - Tri-role structure: Producers (energy-rich leaders), Scroungers (foragers), and Scouts/Watchers (anti-predation alarms).
- * - Dynamic warning threshold R_2 vs Safety Threshold ST (ST = 0.8).
+ * Sparrow Search Algorithm (SSA) Producer-Scrounger-Warning Metaheuristic for Traveling Salesperson Problem (TSP).
+ * Bio-inspired avian foraging and anti-predation behavioral search primitive offering:
+ * - O(I \cdot N \cdot n) polynomial time complexity across I iterations and N virtual sparrows.
+ * - Producers exploring wide foraging areas guided by safety threshold ST.
+ * - Scroungers following top producers to maximize caloric intake.
+ * - Anti-predation early warning sentinels (20% of population) triggering emergency evasions.
  * - 2-Opt local search refinement.
  * - Full unit test coverage.
  */
@@ -14,7 +15,7 @@ export interface Point2D {
     y: number;
 }
 
-export interface SSATSPResult {
+export interface SparrowTSPResult {
     found: boolean;
     initialCost: number;
     bestCost: number;
@@ -63,11 +64,11 @@ export class DistributedSparrowSearchTSPOptimizer {
     }
 
     /**
-     * Sparrow guided crossover towards target leader.
+     * Sparrow flock crossover towards target position.
      */
-    private sparrowMove(sparrowTour: number[], targetTour: number[], intensity: number, rng: () => number): number[] {
-        const n = sparrowTour.length;
-        const result = [...sparrowTour];
+    private sparrowMove(tour: number[], targetTour: number[], intensity: number, rng: () => number): number[] {
+        const n = tour.length;
+        const result = [...tour];
         const numSwaps = Math.max(1, Math.round(intensity * n * 0.35));
 
         for (let s = 0; s < numSwaps; s++) {
@@ -93,7 +94,7 @@ export class DistributedSparrowSearchTSPOptimizer {
         populationSize = 20,
         safetyThreshold = 0.8,
         rng: () => number = Math.random
-    ): SSATSPResult {
+    ): SparrowTSPResult {
         const n = this.points.length;
         if (n === 0) {
             return { found: false, initialCost: 0, bestCost: 0, tour: [], iterationsCompleted: 0 };
@@ -111,9 +112,8 @@ export class DistributedSparrowSearchTSPOptimizer {
             };
         }
 
-        const effectivePop = Math.max(8, Math.min(50, populationSize));
-        const producerCount = Math.max(2, Math.floor(effectivePop * 0.2));
-        const scoutCount = Math.max(2, Math.floor(effectivePop * 0.2));
+        const effectivePop = Math.max(5, Math.min(50, populationSize));
+        const producerCount = Math.max(1, Math.round(effectivePop * 0.2));
 
         // 1. Initialize Sparrow population
         let sparrows: { tour: number[]; cost: number }[] = [];
@@ -128,56 +128,63 @@ export class DistributedSparrowSearchTSPOptimizer {
         const initialCost = bestSparrow.cost;
 
         for (let iter = 0; iter < maxIterations; iter++) {
-            const r2 = rng(); // Alarm warning value
+            const R2 = rng(); // Alarm value [0, 1]
 
-            // 1. Producers phase
+            // 1. Update Producers (Find best foraging spots)
             for (let i = 0; i < producerCount; i++) {
                 let newTour: number[];
-                if (r2 < safetyThreshold) {
-                    // Safe foraging: small random exploration
-                    newTour = this.sparrowMove(sparrows[i].tour, bestSparrow.tour, 0.3 * (1 - iter / maxIterations), rng);
+                if (R2 < safetyThreshold) {
+                    // Safe foraging: wide exploration
+                    const alpha = Math.exp(-iter / (maxIterations * 0.5));
+                    newTour = this.sparrowMove(sparrows[i].tour, bestSparrow.tour, alpha * 0.5, rng);
                 } else {
-                    // Danger detected: anti-predator dispersion
-                    const randTour = this.generateRandomPermutation(n, rng);
-                    newTour = this.sparrowMove(sparrows[i].tour, randTour, 0.7, rng);
+                    // Danger detected: fly to random safe spot
+                    const randomSpot = this.generateRandomPermutation(n, rng);
+                    newTour = this.sparrowMove(sparrows[i].tour, randomSpot, 0.4, rng);
                 }
 
                 const newCost = this.computeTourCost(newTour);
                 if (newCost < sparrows[i].cost) {
                     sparrows[i] = { tour: newTour, cost: newCost };
+                    if (newCost < bestSparrow.cost) {
+                        bestSparrow = { tour: newTour, cost: newCost };
+                    }
                 }
             }
 
-            // 2. Scroungers phase
+            // 2. Update Scroungers (Follow producers)
             for (let i = producerCount; i < effectivePop; i++) {
                 let newTour: number[];
                 if (i > effectivePop / 2) {
-                    // Low energy scrounger moves towards best producer
-                    newTour = this.sparrowMove(sparrows[i].tour, bestSparrow.tour, 0.8, rng);
+                    // Hungry scroungers forage elsewhere
+                    const randomSpot = this.generateRandomPermutation(n, rng);
+                    newTour = this.sparrowMove(sparrows[i].tour, randomSpot, 0.5, rng);
                 } else {
-                    // Competing scrounger follows a random producer
-                    const randProducerIdx = Math.floor(rng() * producerCount);
-                    newTour = this.sparrowMove(sparrows[i].tour, sparrows[randProducerIdx].tour, 0.5, rng);
+                    // Forage around best producer
+                    newTour = this.sparrowMove(sparrows[i].tour, sparrows[0].tour, 0.6, rng);
                 }
 
                 const newCost = this.computeTourCost(newTour);
                 if (newCost < sparrows[i].cost) {
                     sparrows[i] = { tour: newTour, cost: newCost };
+                    if (newCost < bestSparrow.cost) {
+                        bestSparrow = { tour: newTour, cost: newCost };
+                    }
                 }
             }
 
-            // 3. Scouts / Watchers anti-predation alarm phase
-            for (let s = 0; s < scoutCount; s++) {
-                const scoutIdx = Math.floor(rng() * effectivePop);
+            // 3. Early Warning Sentinels (20% aware of danger)
+            const sentinelCount = Math.max(1, Math.round(effectivePop * 0.2));
+            for (let s = 0; s < sentinelCount; s++) {
+                const idx = Math.floor(rng() * effectivePop);
                 let newTour: number[];
-
-                if (sparrows[scoutIdx].cost > bestSparrow.cost) {
-                    // Sparrow is at outer edge, retreats to center/best
-                    newTour = this.sparrowMove(sparrows[scoutIdx].tour, bestSparrow.tour, 0.6, rng);
+                if (sparrows[idx].cost > bestSparrow.cost) {
+                    // Edge of flock flies to center
+                    newTour = this.sparrowMove(sparrows[idx].tour, bestSparrow.tour, 0.7, rng);
                 } else {
-                    // Central sparrow moves away from others to spread alarm
-                    const randOther = sparrows[Math.floor(rng() * effectivePop)].tour;
-                    newTour = this.sparrowMove(sparrows[scoutIdx].tour, randOther, 0.4, rng);
+                    // Center of flock disperses slightly
+                    const randomSpot = this.generateRandomPermutation(n, rng);
+                    newTour = this.sparrowMove(sparrows[idx].tour, randomSpot, 0.2, rng);
                 }
 
                 // 2-opt local search refinement
@@ -198,15 +205,15 @@ export class DistributedSparrowSearchTSPOptimizer {
                 }
 
                 const newCost = this.computeTourCost(newTour);
-                if (newCost < sparrows[scoutIdx].cost) {
-                    sparrows[scoutIdx] = { tour: newTour, cost: newCost };
+                if (newCost < sparrows[idx].cost) {
+                    sparrows[idx] = { tour: newTour, cost: newCost };
+                    if (newCost < bestSparrow.cost) {
+                        bestSparrow = { tour: newTour, cost: newCost };
+                    }
                 }
             }
 
             sparrows.sort((a, b) => a.cost - b.cost);
-            if (sparrows[0].cost < bestSparrow.cost) {
-                bestSparrow = { ...sparrows[0] };
-            }
         }
 
         const finalTour: string[] = [...bestSparrow.tour.map(i => this.points[i].id), this.points[bestSparrow.tour[0]].id];
