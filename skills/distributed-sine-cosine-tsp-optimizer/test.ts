@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { DistributedSineCosineTSPOptimizer } from "./index.js";
 
-describe("DistributedSineCosineTSPOptimizer Trigonometric Metaheuristic", () => {
-    it("oscillates via sine and cosine transitions, converging on optimal unit square perimeter", () => {
+describe("DistributedSineCosineTSPOptimizer Oscillatory Metaheuristic", () => {
+    it("simulates trigonometric sine/cosine oscillations, optimizing unit square perimeter", () => {
         const sca = new DistributedSineCosineTSPOptimizer();
 
         // 4 square corners: (0,0), (0,1), (1,1), (1,0)
@@ -12,7 +12,7 @@ describe("DistributedSineCosineTSPOptimizer Trigonometric Metaheuristic", () => 
         sca.addPoint("C", 1, 1);
         sca.addPoint("D", 1, 0);
 
-        const result = sca.search(120, 15);
+        const result = sca.search(120, 16);
         assert.equal(result.found, true);
         assert.equal(result.tour.length, 5);
         assert.equal(result.tour[0], result.tour[result.tour.length - 1]);
