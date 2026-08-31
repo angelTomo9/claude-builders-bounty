@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { DistributedSalpSwarmTSPOptimizer } from "./index.js";
 
-describe("DistributedSalpSwarmTSPOptimizer Ocean Chain Metaheuristic", () => {
-    it("simulates leader salp food tracking and follower chain propagation, optimizing unit square perimeter", () => {
+describe("DistributedSalpSwarmTSPOptimizer Hydrodynamic Chain Metaheuristic", () => {
+    it("simulates leader-follower chain navigation, optimizing unit square perimeter", () => {
         const ssa = new DistributedSalpSwarmTSPOptimizer();
 
         // 4 square corners: (0,0), (0,1), (1,1), (1,0)

@@ -1,9 +1,10 @@
 /**
- * Salp Swarm Algorithm (SSA) Deep Ocean Chain & Food Tracking Metaheuristic for Traveling Salesperson Problem (TSP).
- * Bio-inspired salpidae swarming optimization primitive offering:
- * - O(I \cdot N \cdot n) polynomial time complexity across I iterations and N salps.
- * - Leader salp food attraction modulated by c1 = 2 * exp(-(4t / T)^2).
- * - Follower salp chain propagation obeying cohesive hydrodynamic swimming dynamics.
+ * Salp Swarm Algorithm (SSA) Leader-Follower Swarm Metaheuristic for Traveling Salesperson Problem (TSP).
+ * Bio-inspired pelagic tunicate ocean swarm search primitive offering:
+ * - O(I \cdot N \cdot n) polynomial time complexity across I iterations and N chained salps.
+ * - Dynamic balancing coefficient c_1 = 2 * exp(-(4t / T)^2) governing exploration-exploitation.
+ * - Leader salp navigation towards optimal food source (F*).
+ * - Follower salps chain movement transmitting positional coordinates.
  * - 2-Opt local search refinement.
  * - Full unit test coverage.
  */
@@ -63,9 +64,9 @@ export class DistributedSalpSwarmTSPOptimizer {
     }
 
     /**
-     * Salp guided crossover towards swarming target / leader.
+     * Hydrodynamic chain crossover towards target guide salp.
      */
-    private salpMove(tour: number[], targetTour: number[], intensity: number, rng: () => number): number[] {
+    private salpChainMove(tour: number[], targetTour: number[], intensity: number, rng: () => number): number[] {
         const n = tour.length;
         const result = [...tour];
         const numSwaps = Math.max(1, Math.round(intensity * n * 0.35));
@@ -90,7 +91,7 @@ export class DistributedSalpSwarmTSPOptimizer {
      */
     public search(
         maxIterations = 100,
-        populationSize = 20,
+        swarmSize = 20,
         rng: () => number = Math.random
     ): SSATSPResult {
         const n = this.points.length;
@@ -110,31 +111,37 @@ export class DistributedSalpSwarmTSPOptimizer {
             };
         }
 
-        const effectivePop = Math.max(5, Math.min(50, populationSize));
+        const effectivePop = Math.max(5, Math.min(50, swarmSize));
 
         // 1. Initialize Salp Swarm population
-        let salps: { tour: number[]; cost: number }[] = [];
+        let swarm: { tour: number[]; cost: number }[] = [];
         for (let i = 0; i < effectivePop; i++) {
             const tour = this.generateRandomPermutation(n, rng);
-            salps.push({ tour, cost: this.computeTourCost(tour) });
+            swarm.push({ tour, cost: this.computeTourCost(tour) });
         }
 
-        salps.sort((a, b) => a.cost - b.cost);
+        swarm.sort((a, b) => a.cost - b.cost);
 
-        let foodSource = { ...salps[0] };
+        let foodSource = { ...swarm[0] };
         const initialCost = foodSource.cost;
 
         for (let iter = 0; iter < maxIterations; iter++) {
-            // Decay parameter c1 = 2 * exp(-(4 * iter / maxIterations)^2)
+            // Adaptive coefficient c1 decreases from 2 to 0
             const c1 = 2 * Math.exp(-Math.pow((4 * iter) / maxIterations, 2));
 
-            // Leader salp update (first half)
-            for (let i = 0; i < Math.floor(effectivePop / 2); i++) {
-                const c2 = rng();
-                const c3 = rng();
-                const intensity = Math.min(1.0, 0.5 * c1 * (c3 >= 0.5 ? c2 : (1 - c2)));
+            for (let i = 0; i < effectivePop; i++) {
+                let newTour: number[];
 
-                let newTour = this.salpMove(salps[i].tour, foodSource.tour, intensity, rng);
+                if (i === 0) {
+                    // Leader salp updates position with respect to food source
+                    const c2 = rng();
+                    const c3 = rng();
+                    const leaderIntensity = c3 >= 0.5 ? Math.min(1.0, c1 * c2) : Math.max(0.1, 1.0 - c1 * c2);
+                    newTour = this.salpChainMove(swarm[i].tour, foodSource.tour, leaderIntensity, rng);
+                } else {
+                    // Follower salps move based on position of previous salp in chain
+                    newTour = this.salpChainMove(swarm[i].tour, swarm[i - 1].tour, 0.5, rng);
+                }
 
                 // 2-opt local search refinement
                 if (rng() < 0.2) {
@@ -154,49 +161,15 @@ export class DistributedSalpSwarmTSPOptimizer {
                 }
 
                 const newCost = this.computeTourCost(newTour);
-                if (newCost < salps[i].cost) {
-                    salps[i] = { tour: newTour, cost: newCost };
+                if (newCost < swarm[i].cost) {
+                    swarm[i] = { tour: newTour, cost: newCost };
                     if (newCost < foodSource.cost) {
                         foodSource = { tour: newTour, cost: newCost };
                     }
                 }
             }
 
-            // Follower salp chain update (second half)
-            for (let i = Math.floor(effectivePop / 2); i < effectivePop; i++) {
-                const prevSalp = salps[i - 1];
-                let newTour = this.salpMove(salps[i].tour, prevSalp.tour, 0.6, rng);
-
-                // 2-opt local search refinement
-                if (rng() < 0.15) {
-                    const l = Math.floor(rng() * n);
-                    let rp = Math.floor(rng() * n);
-                    while (rp === l) rp = Math.floor(rng() * n);
-                    const left = Math.min(l, rp);
-                    const right = Math.max(l, rp);
-                    let lp = left, rpp = right;
-                    while (lp < rpp) {
-                        const tmp = newTour[lp];
-                        newTour[lp] = newTour[rpp];
-                        newTour[rpp] = tmp;
-                        lp++;
-                        rpp--;
-                    }
-                }
-
-                const newCost = this.computeTourCost(newTour);
-                if (newCost < salps[i].cost) {
-                    salps[i] = { tour: newTour, cost: newCost };
-                    if (newCost < foodSource.cost) {
-                        foodSource = { tour: newTour, cost: newCost };
-                    }
-                }
-            }
-
-            salps.sort((a, b) => a.cost - b.cost);
-            if (salps[0].cost < foodSource.cost) {
-                foodSource = { ...salps[0] };
-            }
+            swarm.sort((a, b) => a.cost - b.cost);
         }
 
         const finalTour: string[] = [...foodSource.tour.map(i => this.points[i].id), this.points[foodSource.tour[0]].id];
